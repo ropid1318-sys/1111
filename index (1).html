@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>좌석 현황</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    min-height: 100vh;
+    padding: 16px;
+    padding-bottom: 32px;
+}
+
+.container { max-width: 900px; margin: 0 auto; }
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 4px 2px;
+}
+
+header h1 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.updated {
+    font-size: 12px;
+    color: #86868b;
+}
+
+.updated .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    background: #30d158;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.summary-card {
+    background: white;
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.summary-card .label {
+    font-size: 12px;
+    color: #86868b;
+    margin-bottom: 6px;
+}
+
+.summary-card .available {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1d1d1f;
+    line-height: 1;
+}
+
+.summary-card .available.full {
+    color: #ff3b30;
+}
+
+.summary-card .available.soon {
+    color: #ff9500;
+}
+
+.summary-card .total {
+    font-size: 12px;
+    color: #86868b;
+    margin-top: 4px;
+}
+
+section {
+    background: white;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+section h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.seatmap {
+    position: relative;
+    width: 100%;
+    overflow: auto;
+    background: #fafafa;
+    border-radius: 8px;
+    min-height: 300px;
+}
+
+.seatmap-inner {
+    position: relative;
+    transform-origin: 0 0;
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+.seat {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 500;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.seat.available {
+    background-color: rgba(52, 199, 89, 0.15);
+    border: 1.5px solid #34c759;
+    color: #1d7a3f;
+    border-radius: 4px;
+}
+
+.seat.occupied {
+    background-color: rgba(255, 59, 48, 0.15);
+    border: 1.5px solid #ff3b30;
+    color: #8b1e16;
+    border-radius: 4px;
+}
+
+.legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #424245;
+}
+
+.legend .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+.legend .swatch.available {
+    background: rgba(52, 199, 89, 0.3);
+    border: 1.5px solid #34c759;
+}
+
+.legend .swatch.occupied {
+    background: rgba(255, 59, 48, 0.3);
+    border: 1.5px solid #ff3b30;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #86868b;
+}
+
+.error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #ff3b30;
+    font-size: 14px;
+}
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 11px;
+    color: #a1a1a6;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>좌석 현황</h1>
+        <div class="updated" id="updated">
+            <span class="dot"></span>
+            <span id="updated-text">불러오는 중...</span>
+        </div>
+    </header>
+
+    <div class="summary" id="summary">
+        <div class="summary-card">
+            <div class="label">일반석</div>
+            <div class="available" id="seat-avail">-</div>
+            <div class="total" id="seat-total">잔여 / 전체</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">스터디룸</div>
+            <div class="available" id="studyroom-avail">-</div>
+            <div class="total" id="studyroom-total">잔여 / 전체</div>
+        </div>
+        <div class="summary-card">
+            <div class="label">사물함</div>
+            <div class="available" id="locker-avail">-</div>
+            <div class="total" id="locker-total">잔여 / 전체</div>
+        </div>
+    </div>
+
+    <section>
+        <h2>좌석 배치도</h2>
+        <div class="seatmap" id="seatmap-container">
+            <div class="loading" id="seatmap-loading">좌석 정보를 불러오는 중...</div>
+        </div>
+        <div class="legend">
+            <div class="item"><span class="swatch available"></span>잔여</div>
+            <div class="item"><span class="swatch occupied"></span>사용중</div>
+        </div>
+    </section>
+
+    <section id="locker-section" style="display: none;">
+        <h2>사물함 현황</h2>
+        <div class="seatmap" id="locker-container"></div>
+    </section>
+
+    <footer>30초마다 자동 업데이트</footer>
+</div>
+
+<script>
+// ============================================================
+// 설정 — GitHub Gist에서 seats.json을 읽어옵니다
+// ============================================================
+const GIST_RAW_URL = "https://gist.githubusercontent.com/YOUR_USERNAME/YOUR_GIST_ID/raw/seats.json";
+
+// ============================================================
+// 데이터 가져오기 및 렌더링
+// ============================================================
+async function fetchData() {
+    try {
+        // 캐시 방지를 위해 타임스탬프 추가
+        const url = `${GIST_RAW_URL}?t=${Date.now()}`;
+        const response = await fetch(url);
+
+        if (!response.ok) throw new Error("fetch failed");
+
+        const data = await response.json();
+        render(data);
+    } catch (e) {
+        console.error(e);
+        document.getElementById("updated-text").textContent = "연결 실패";
+        document.querySelector(".dot").style.background = "#ff3b30";
+    }
+}
+
+function render(data) {
+    renderSummary(data.summary);
+    renderMap(
+        document.getElementById("seatmap-container"),
+        data.seatmap,
+        "seatmap-loading"
+    );
+
+    if (data.locker && data.locker.locations && data.locker.locations.length > 0) {
+        document.getElementById("locker-section").style.display = "block";
+        renderMap(
+            document.getElementById("locker-container"),
+            data.locker,
+            null
+        );
+    }
+
+    renderUpdatedTime(data.updated_at);
+}
+
+function renderSummary(s) {
+    updateSummaryCard("seat", s.seat_used, s.seat_total);
+    updateSummaryCard("studyroom", s.studyroom_used, s.studyroom_total);
+    updateSummaryCard("locker", s.locker_used, s.locker_total);
+}
+
+function updateSummaryCard(prefix, used, total) {
+    const available = total - used;
+    const availEl = document.getElementById(`${prefix}-avail`);
+    const totalEl = document.getElementById(`${prefix}-total`);
+
+    availEl.textContent = available;
+    totalEl.textContent = `잔여 / ${total}석`;
+
+    availEl.classList.remove("full", "soon");
+    if (available === 0) {
+        availEl.classList.add("full");
+    } else if (available <= Math.ceil(total * 0.15)) {
+        availEl.classList.add("soon");
+    }
+}
+
+function renderMap(container, mapData, loadingId) {
+    if (loadingId) {
+        const loading = document.getElementById(loadingId);
+        if (loading) loading.remove();
+    }
+
+    if (!mapData || !mapData.locations || mapData.locations.length === 0) {
+        container.innerHTML = '<div class="loading">배치도 정보가 없습니다</div>';
+        return;
+    }
+
+    // 배치도 범위 계산
+    let maxX = 0, maxY = 0;
+    mapData.locations.forEach(loc => {
+        const right = (loc.position?.left || 0) + (loc.size?.width || 0);
+        const bottom = (loc.position?.top || 0) + (loc.size?.height || 0);
+        if (right > maxX) maxX = right;
+        if (bottom > maxY) maxY = bottom;
+    });
+
+    maxX += 40;
+    maxY += 40;
+
+    // inner div 준비
+    let inner = container.querySelector(".seatmap-inner");
+    if (!inner) {
+        container.innerHTML = "";
+        inner = document.createElement("div");
+        inner.className = "seatmap-inner";
+        container.appendChild(inner);
+    } else {
+        inner.innerHTML = "";
+    }
+
+    inner.style.width = maxX + "px";
+    inner.style.height = maxY + "px";
+
+    if (mapData.background) {
+        inner.style.backgroundImage = `url('${mapData.background}')`;
+    }
+
+    // 좌석 렌더링
+    mapData.locations.forEach(loc => {
+        const seat = document.createElement("div");
+        seat.className = "seat " + (loc.status ? "available" : "occupied");
+
+        seat.style.left = (loc.position?.left || 0) + "px";
+        seat.style.top = (loc.position?.top || 0) + "px";
+        seat.style.width = (loc.size?.width || 40) + "px";
+        seat.style.height = (loc.size?.height || 40) + "px";
+
+        if (loc.rotate) {
+            seat.style.transform = `rotate(${loc.rotate}deg)`;
+        }
+
+        const label = loc.name || loc.number || "";
+        seat.textContent = label;
+
+        inner.appendChild(seat);
+    });
+
+    // 모바일에서 화면 너비에 맞춰 자동 축소
+    fitToContainer(container, inner, maxX);
+}
+
+function fitToContainer(container, inner, contentWidth) {
+    const containerWidth = container.clientWidth;
+    if (contentWidth > containerWidth) {
+        const scale = containerWidth / contentWidth;
+        inner.style.transform = `scale(${scale})`;
+        container.style.height = (inner.offsetHeight * scale + 20) + "px";
+    }
+}
+
+function renderUpdatedTime(iso) {
+    if (!iso) return;
+
+    const updated = new Date(iso);
+    const now = new Date();
+    const diffSec = Math.floor((now - updated) / 1000);
+
+    let text;
+    if (diffSec < 60) text = "방금 업데이트";
+    else if (diffSec < 3600) text = `${Math.floor(diffSec / 60)}분 전`;
+    else text = `${Math.floor(diffSec / 3600)}시간 전`;
+
+    document.getElementById("updated-text").textContent = text;
+
+    // 5분 이상 업데이트 없으면 경고
+    const dot = document.querySelector(".dot");
+    if (diffSec > 300) {
+        dot.style.background = "#ff9500";
+    } else {
+        dot.style.background = "#30d158";
+    }
+}
+
+// ============================================================
+// 초기 로드 및 주기적 갱신
+// ============================================================
+fetchData();
+setInterval(fetchData, 30000);
+
+// 화면 크기 변경 시 재렌더링
+let resizeTimer;
+window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fetchData, 300);
+});
+
+// 화면이 다시 보일 때 즉시 갱신
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) fetchData();
+});
+</script>
+</body>
+</html>
